@@ -32,6 +32,35 @@ void main() {
     });
   });
 
+  group('rewriteMirror', () {
+    test('cambia el host y conserva ruta y query', () {
+      expect(PelisPlusHDSource.rewriteMirror('https://streamwish.to/e/ncoyu37o4v2q'),
+          'https://embedwish.com/e/ncoyu37o4v2q');
+      expect(PelisPlusHDSource.rewriteMirror('https://vidhidepro.com/v/7p0egbcbsti2'),
+          'https://callistanise.com/v/7p0egbcbsti2');
+      expect(PelisPlusHDSource.rewriteMirror('https://STREAMWISH.TO/e/abc?x=1&y=2'),
+          'https://embedwish.com/e/abc?x=1&y=2');
+    });
+
+    test('deja intactos los demás hosts', () {
+      for (final u in [
+        'https://dood.to/e/g2zs79ym4jzs',
+        'https://embedwish.com/e/ya-es-el-espejo',
+        'https://upstream.to/embed-vah614toujm0.html',
+        'https://notstreamwish.to/e/abc', // solo coincide el host completo
+      ]) {
+        expect(PelisPlusHDSource.rewriteMirror(u), u);
+      }
+      expect(PelisPlusHDSource.rewriteMirror('no es una url'), 'no es una url');
+    });
+
+    test('la tabla no tiene ciclos (un espejo no se vuelve a reescribir)', () {
+      for (final mirror in PelisPlusHDSource.mirrorHosts.values) {
+        expect(PelisPlusHDSource.mirrorHosts.containsKey(mirror), isFalse);
+      }
+    });
+  });
+
   group('URLs', () {
     final s = PelisPlusHDSource();
 

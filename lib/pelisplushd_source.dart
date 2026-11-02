@@ -293,7 +293,7 @@ class PelisPlusHDSource implements core.SourcePlugin {
     final seen = <String>{};
     final out = <core.VideoServer>[];
     for (var i = 0; i < entries.length; i++) {
-      final url = resolved[i];
+      final url = resolved[i] == null ? null : rewriteMirror(resolved[i]!);
       if (url == null || !seen.add(url)) continue;
       final lang = entries[i].lang;
       out.add(core.VideoServer(
@@ -308,6 +308,28 @@ class PelisPlusHDSource implements core.SourcePlugin {
 
   /// Extractores del proxy para los servidores de este sitio (vidhide se resuelve con streamwish).
   static const proxySupported = ['streamwish', 'vidhide', 'doodstream', 'voe', 'filemoon', 'mp4upload'];
+
+  /// Dominios que el sitio da pero el extractor del proxy no puede leer, y el espejo que sí.
+  /// Mismo archivo, mismo código en la ruta; solo cambia el host.
+  ///
+  ///  * `streamwish.to`: hoy sirve un cargador de JS ofuscado (`/main.js`) en vez del reproductor
+  ///    con el `.m3u8` en el HTML, así que el extractor responde "m3u8 not found".
+  ///  * `vidhidepro.com`: redirige a `vidhidefast.com`, inalcanzable desde algunas redes.
+  ///
+  /// Los espejos también rotan (por ejemplo `streamwish.com` da 403 y `vidhide.com` da 522):
+  /// si uno deja de funcionar, se cambia o se añade aquí. Verificado el 2026-11-02 con el
+  /// extractor `streamwish` del proxy.
+  static const mirrorHosts = <String, String>{
+    'streamwish.to': 'embedwish.com',
+    'vidhidepro.com': 'callistanise.com',
+  };
+
+  /// Cambia el host de [url] si tiene un espejo en [mirrorHosts]; si no, la devuelve igual.
+  static String rewriteMirror(String url) {
+    final uri = Uri.tryParse(url);
+    final mirror = uri == null ? null : mirrorHosts[uri.host.toLowerCase()];
+    return mirror == null ? url : uri!.replace(host: mirror).toString();
+  }
 
   static String _serverLabel(String text) {
     final raw = text.trim().toLowerCase();
