@@ -36,15 +36,7 @@ String fixMojibake(String s) {
   }
 }
 
-/// Fuente PelisPlusHD: **solo películas** (el sitio también tiene series, animes y doramas,
-/// que se ignoran).
-///
-///  * "slug" de la app = `pelicula/{slug}`.
-///  * Servidores: la ficha usa uno de dos diseños, ambos en texto plano:
-///    - nuevo: `li.playurl[data-url]`. Cada `data-url` es un `player.php?h=<hash>` de una página
-///      intermedia que lleva la URL real (`var url = 'https://streamwish.to/e/…'`), así que hay
-///      una petición extra por servidor.
-///    - antiguo: `li[data-id]` + `#link_url span[lid][url]`, con la URL directa del embed.
+/// Solo películas: el sitio también tiene series, animes y doramas, que se ignoran.
 class PelisPlusHDSource implements core.SourcePlugin {
   PelisPlusHDSource({String? baseUrl}) : baseUrl = baseUrl ?? defaultBaseUrl {
     _dio = Dio(BaseOptions(
@@ -84,11 +76,6 @@ class PelisPlusHDSource implements core.SourcePlugin {
   @override
   core.FilterOptions get filterOptions => _filterOptions;
 
-  // ----------------------------------------------------------
-  // URLs
-  // ----------------------------------------------------------
-
-  /// `https://pelisplushd.la/pelicula/caballo-salvaje-nueve` → `pelicula/caballo-salvaje-nueve`.
   @override
   String slugFromUrl(String url) {
     final segs = Uri.tryParse(url)?.pathSegments.where((s) => s.isNotEmpty).toList() ?? [];
@@ -118,11 +105,6 @@ class PelisPlusHDSource implements core.SourcePlugin {
     return html_parser.parse(res.data ?? '');
   }
 
-  // ----------------------------------------------------------
-  // Listados (tarjetas `a.Posters-link`)
-  // ----------------------------------------------------------
-
-  /// Tarjetas de **películas** de una página; las series y animes se descartan.
   List<({String titulo, String url, String imagen})> _movieCards(Document doc) {
     final seen = <String>{};
     final out = <({String titulo, String url, String imagen})>[];
@@ -156,11 +138,9 @@ class PelisPlusHDSource implements core.SourcePlugin {
           core.RecentSerie(titulo: c.titulo, url: c.url, imagen: c.imagen),
       ];
 
-  /// TODO: el sitio no tiene una lista de episodios (solo películas).
   @override
   Future<List<core.RecentEpisode>> getLatestEpisodes() async => [];
 
-  /// "Emisión": las películas más recientes, paginadas.
   @override
   Future<List<core.AiringAnime>> getAiringAnimes({int page = 1}) async {
     final doc = await _getDoc('$baseUrl/peliculas', query: {if (page > 1) 'page': '$page'});
@@ -202,10 +182,6 @@ class PelisPlusHDSource implements core.SourcePlugin {
     ];
   }
 
-  // ----------------------------------------------------------
-  // Detalle
-  // ----------------------------------------------------------
-
   @override
   Future<core.AnimeDetail> getAnime(String slug) async {
     final clean = slugFromUrl(slug);
@@ -236,10 +212,6 @@ class PelisPlusHDSource implements core.SourcePlugin {
       episodios: [core.Episode(numero: 1, url: pageUrl, titulo: 'Película')],
     );
   }
-
-  // ----------------------------------------------------------
-  // Servidores
-  // ----------------------------------------------------------
 
   static const _labels = <String, String>{
     'streamwish': 'Streamwish',
@@ -306,25 +278,15 @@ class PelisPlusHDSource implements core.SourcePlugin {
     return [...out.where(supported), ...out.where((v) => !supported(v))];
   }
 
-  /// Extractores del proxy para los servidores de este sitio (vidhide se resuelve con streamwish).
   static const proxySupported = ['streamwish', 'vidhide', 'doodstream', 'voe', 'filemoon', 'mp4upload'];
 
-  /// Dominios que el sitio da pero el extractor del proxy no puede leer, y el espejo que sí.
-  /// Mismo archivo, mismo código en la ruta; solo cambia el host.
-  ///
-  ///  * `streamwish.to`: hoy sirve un cargador de JS ofuscado (`/main.js`) en vez del reproductor
-  ///    con el `.m3u8` en el HTML, así que el extractor responde "m3u8 not found".
-  ///  * `vidhidepro.com`: redirige a `vidhidefast.com`, inalcanzable desde algunas redes.
-  ///
-  /// Los espejos también rotan (por ejemplo `streamwish.com` da 403 y `vidhide.com` da 522):
-  /// si uno deja de funcionar, se cambia o se añade aquí. Verificado el 2026-11-02 con el
-  /// extractor `streamwish` del proxy.
+  /// Hosts que el extractor del proxy no puede leer y su espejo (mismo archivo y ruta). Los
+  /// espejos también rotan: si uno deja de funcionar, se cambia aquí.
   static const mirrorHosts = <String, String>{
     'streamwish.to': 'embedwish.com',
     'vidhidepro.com': 'callistanise.com',
   };
 
-  /// Cambia el host de [url] si tiene un espejo en [mirrorHosts]; si no, la devuelve igual.
   static String rewriteMirror(String url) {
     final uri = Uri.tryParse(url);
     final mirror = uri == null ? null : mirrorHosts[uri.host.toLowerCase()];
@@ -337,9 +299,7 @@ class PelisPlusHDSource implements core.SourcePlugin {
     return _labels[raw] ?? raw[0].toUpperCase() + raw.substring(1);
   }
 
-  /// Convierte el `data-url` (`player.php?h=…`) en la URL real del embed.
-  /// La página intermedia la trae en `var url = '…';` junto a una cuenta atrás de anuncios.
-  /// Los `data-url` que ya son un embed directo se devuelven tal cual.
+  /// La página intermedia `player.php?h=…` trae la URL real en `var url = '…';`.
   Future<String?> _resolve(String dataUrl) async {
     final uri = Uri.tryParse(dataUrl);
     if (uri == null || !uri.path.endsWith('player.php')) return dataUrl;
@@ -358,7 +318,6 @@ class PelisPlusHDSource implements core.SourcePlugin {
     }
   }
 
-  /// `var url = 'https://streamwish.to/e/ncoyu37o4v2q';` → la URL.
   static String? extractEmbedUrl(String html) =>
       RegExp(r'''var\s+url\s*=\s*['"](https?://[^'"]+)['"]''').firstMatch(html)?.group(1);
 }
@@ -368,7 +327,6 @@ final _filterOptions = core.FilterOptions(
   anios: [for (var y = 2026; y >= 1921; y--) core.FilterOption('$y', '$y')],
 );
 
-// Valores tal como los usa pelisplushd.la/generos/{valor} (sin "dorama", que son series).
 const _generos = <core.FilterOption>[
   core.FilterOption('accion', 'Acción'),
   core.FilterOption('animacion', 'Animación'),
